@@ -27,7 +27,6 @@ USE_STRING_ID(REAL);
 #include "forte_ulint.h"
 
 #include <forte_printer.h>
-#include "../../arch/forte_realFunctions.h"
 
 DEFINE_FIRMWARE_DATATYPE(REAL, STRID(REAL))
 
@@ -41,9 +40,9 @@ int CIEC_REAL::fromString(const char *paValue) {
   }
 
   errno = 0;
-  realval = forte_stringToFloat(pacRunner, &pcEnd);
+  realval = strtof(pacRunner, &pcEnd);
 
-  if (pacRunner == pcEnd || !std::isfinite(realval) || errno != 0) {
+  if (pacRunner == pcEnd || errno != 0) {
     return -1;
   }
 
