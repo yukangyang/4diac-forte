@@ -121,6 +121,8 @@ class COPC_UA_Local_Handler : public COPC_UA_HandlerAbstract, public CThread {
                                         std::string &paNodeName,
                                         std::vector<UA_NodeId *> &paRreferencedNodes) const;
 
+    UA_BrowseResult browseServer(UA_BrowseDescription &paBrowseDescription);
+
     /**
      * Default value for the namespace of the browsename for all created nodes
      */

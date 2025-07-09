@@ -1198,6 +1198,10 @@ void COPC_UA_Local_Handler::initializeCreateInfo(std::string &paNodeName,
   paResult.mParentNodeId = paParentNodeId;
 }
 
+UA_BrowseResult COPC_UA_Local_Handler::browseServer(UA_BrowseDescription &paBrowseDescription) {
+  return UA_Server_browse(mUaServer, 500, &paBrowseDescription);
+}
+
 UA_StatusCode COPC_UA_Local_Handler::getNode(CActionInfo::CNodePairInfo &paNodePairInfo,
                                              std::vector<UA_NodeId *> &paFoundNodeIds,
                                              bool *paIsPresent) {
