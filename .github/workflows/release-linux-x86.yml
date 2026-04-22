@@ -1,4 +1,4 @@
-name: Release Multi-Platform
+name: Release Linux x86
 
 on:
   push:
@@ -42,40 +42,40 @@ jobs:
             libboost-all-dev \
             pkg-config
 
+      - name: Verify CMake version
+        run: |
+          CMAKE_VERSION=$(cmake --version | head -n1 | awk '{print $3}')
+          echo "CMake version: $CMAKE_VERSION"
+          if [ "$(printf '%s\n' "3.30" "$CMAKE_VERSION" | sort -V | head -n1)" != "3.30" ]; then
+            echo "Error: CMake version 3.30 or higher is required"
+            exit 1
+          fi
+
       - name: Configure CMake
         run: |
-          mkdir -p build
-          cd build
-          cmake -G "Unix Makefiles" \
-            -DFORTE_ARCHITECTURE=Posix \
-            -DFORTE_COM_ETH=ON \
-            -DFORTE_COM_FBDK=ON \
-            -DFORTE_COM_LOCAL=ON \
+          cmake -B build \
+            --preset posix-release \
             -DFORTE_TESTS=OFF \
-            -DFORTE_MODULE_CONVERT=ON \
-            -DFORTE_MODULE_IEC61131=ON \
-            -DFORTE_MODULE_UTILS=ON \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=/usr/local \
-            ..
+            -DCMAKE_INSTALL_PREFIX=/usr/local
 
       - name: Build
         run: |
-          cd build
-          make -j$(nproc)
+          cmake --build build -j$(nproc)
 
       - name: Package artifacts
         run: |
           mkdir -p artifacts
-          cd build
           
           PACKAGE_DIR="forte-${{ steps.version.outputs.version }}-linux-x86"
           mkdir -p "$PACKAGE_DIR/bin"
           mkdir -p "$PACKAGE_DIR/lib"
           
-          if [ -f "src/forte" ]; then
-            cp src/forte "$PACKAGE_DIR/bin/"
+          if [ -f "build/forte" ]; then
+            cp build/forte "$PACKAGE_DIR/bin/"
             chmod +x "$PACKAGE_DIR/bin/forte"
+          else
+            echo "Error: forte binary not found in build directory"
+            exit 1
           fi
           
           echo "Eclipse 4diac FORTE - Linux x86 Release" > "$PACKAGE_DIR/README.txt"
@@ -90,9 +90,9 @@ jobs:
           echo "" >> "$PACKAGE_DIR/README.txt"
           echo "For more information, visit: https://eclipse.dev/4diac/" >> "$PACKAGE_DIR/README.txt"
           
-          tar -czf "../artifacts/forte-${{ steps.version.outputs.version }}-linux-x86.tar.gz" "$PACKAGE_DIR"
+          tar -czf "artifacts/forte-${{ steps.version.outputs.version }}-linux-x86.tar.gz" "$PACKAGE_DIR"
           
-          cd ../artifacts
+          cd artifacts
           sha256sum forte-${{ steps.version.outputs.version }}-linux-x86.tar.gz > forte-${{ steps.version.outputs.version }}-linux-x86.tar.gz.sha256
 
       - name: Upload artifacts
@@ -102,11 +102,9 @@ jobs:
           path: artifacts/
           retention-days: 5
 
-
-
   create-release:
     name: Create GitHub Release
-    needs: [build-linux-x86, build-windows-x64]
+    needs: build-linux-x86
     runs-on: ubuntu-24.04
 
     steps:
@@ -114,13 +112,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: forte-linux-x86
-          path: artifacts/linux
-
-      - name: Download Windows artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: forte-windows-x64
-          path: artifacts/windows
+          path: artifacts
 
       - name: Set version
         id: version
@@ -144,9 +136,6 @@ jobs:
             ### Linux x86_64
             - **forte-${{ steps.version.outputs.version }}-linux-x86.tar.gz**: Pre-built binary for Linux x86_64
 
-            ### Windows x64
-            - **forte-${{ steps.version.outputs.version }}-windows-x64.zip**: Pre-built binary for Windows x64
-
             ## Installation
 
             ### Linux
@@ -156,22 +145,12 @@ jobs:
             ./bin/forte
             ```
 
-            ### Windows
-            ```powershell
-            Expand-Archive forte-${{ steps.version.outputs.version }}-windows-x64.zip
-            cd forte-${{ steps.version.outputs.version }}-windows-x64
-            .\bin\forte.exe
-            ```
-
             ## System Requirements
 
             ### Linux
             - Linux x86_64
             - glibc 2.39 or later (Ubuntu 24.04+)
-
-            ### Windows
-            - Windows 10/11 x64
-            - Visual C++ Redistributable 2022
+            - CMake 3.30+ (if building from source)
 
             ## Checksums
             See `.sha256` files for verification.
@@ -180,8 +159,7 @@ jobs:
             - [Documentation](https://github.com/eclipse-4diac/4diac-documentation)
             - [Bug Reports](https://github.com/eclipse-4diac/4diac-forte/issues)
           files: |
-            artifacts/linux/*
-            artifacts/windows/*
+            artifacts/*
           draft: false
           prerelease: false
           generate_release_notes: true
