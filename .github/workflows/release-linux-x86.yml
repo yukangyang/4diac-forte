@@ -56,6 +56,7 @@ jobs:
           cmake -B build \
             --preset posix-release \
             -DFORTE_TESTS=OFF \
+            -DFORTE_LOGLEVEL=LOGDEBUG \
             -DCMAKE_INSTALL_PREFIX=/usr/local
 
       - name: Build

@@ -75,3 +75,48 @@ See our Installation Documentation for detailed instructions on supported OS and
 
 🔧 [Examples Repository](https://github.com/eclipse-4diac/4diac-examples)
 
+---
+
+### Command Line Options
+
+```bash
+# Run with custom port
+./bin/forte -c localhost:61500
+
+# Run with debug output
+./bin/forte -d
+
+# Run with verbose logging (shows all IDE operations)
+./bin/forte -d
+```
+
+### Logging Configuration
+
+FORTE supports multiple log levels. The pre-built binary is compiled with **LOGDEBUG** level, which outputs all runtime messages including:
+
+- **Error messages**: Critical failures
+- **Warning messages**: Potential issues
+- **Info messages**: General runtime information
+- **Debug messages**: Detailed operations (IDE deployments, FB executions, etc.)
+
+#### Log Levels Available
+
+| Level | Description | Output |
+|-------|-------------|--------|
+| `NOLOG` | No logging | Nothing |
+| `LOGERROR` | Errors only | Critical failures |
+| `LOGWARNING` | Errors + Warnings | Issues and failures |
+| `LOGINFO` | Errors + Warnings + Info | General operations |
+| `LOGDEBUG` | All messages | Everything (recommended for debugging) |
+
+#### Building with Custom Log Level
+
+If you need to build FORTE with a specific log level:
+
+```bash
+cmake -B build --preset posix-release -DFORTE_LOGLEVEL=LOGDEBUG
+cmake --build build -j$(nproc)
+```
+
+### System Requirements
+
