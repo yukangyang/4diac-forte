@@ -1,0 +1,167 @@
+name: Release Linux x86
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v3.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-linux-x86:
+    name: Build Linux x86 Release
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            libboost-all-dev \
+            pkg-config
+
+      - name: Configure CMake
+        run: |
+          mkdir -p build
+          cd build
+          cmake -G "Unix Makefiles" \
+            -DFORTE_ARCHITECTURE=Posix \
+            -DFORTE_COM_ETH=ON \
+            -DFORTE_COM_FBDK=ON \
+            -DFORTE_COM_LOCAL=ON \
+            -DFORTE_TESTS=OFF \
+            -DFORTE_MODULE_CONVERT=ON \
+            -DFORTE_MODULE_IEC61131=ON \
+            -DFORTE_MODULE_UTILS=ON \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            ..
+
+      - name: Build
+        run: |
+          cd build
+          make -j$(nproc)
+
+      - name: Package artifacts
+        run: |
+          mkdir -p artifacts
+          cd build
+          
+          # Create package directory structure
+          PACKAGE_DIR="forte-${{ steps.version.outputs.version }}-linux-x86"
+          mkdir -p "$PACKAGE_DIR/bin"
+          mkdir -p "$PACKAGE_DIR/lib"
+          
+          # Copy binary
+          if [ -f "src/forte" ]; then
+            cp src/forte "$PACKAGE_DIR/bin/"
+            chmod +x "$PACKAGE_DIR/bin/forte"
+          fi
+          
+          # Create README for the package
+          echo "Eclipse 4diac FORTE - Linux x86 Release" > "$PACKAGE_DIR/README.txt"
+          echo "Version: ${{ steps.version.outputs.version }}" >> "$PACKAGE_DIR/README.txt"
+          echo "Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> "$PACKAGE_DIR/README.txt"
+          echo "Architecture: Linux x86_64" >> "$PACKAGE_DIR/README.txt"
+          echo "" >> "$PACKAGE_DIR/README.txt"
+          echo "This is a pre-built binary of Eclipse 4diac FORTE." >> "$PACKAGE_DIR/README.txt"
+          echo "" >> "$PACKAGE_DIR/README.txt"
+          echo "To run:" >> "$PACKAGE_DIR/README.txt"
+          echo "  ./bin/forte" >> "$PACKAGE_DIR/README.txt"
+          echo "" >> "$PACKAGE_DIR/README.txt"
+          echo "For more information, visit: https://eclipse.dev/4diac/" >> "$PACKAGE_DIR/README.txt"
+          
+          # Create tarball
+          tar -czf "../artifacts/forte-${{ steps.version.outputs.version }}-linux-x86.tar.gz" "$PACKAGE_DIR"
+          
+          # Create checksum
+          cd ../artifacts
+          sha256sum forte-${{ steps.version.outputs.version }}-linux-x86.tar.gz > forte-${{ steps.version.outputs.version }}-linux-x86.tar.gz.sha256
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: forte-linux-x86
+          path: artifacts/
+          retention-days: 5
+
+  create-release:
+    name: Create GitHub Release
+    needs: build-linux-x86
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: forte-linux-x86
+          path: artifacts/
+
+      - name: Set version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Eclipse 4diac FORTE ${{ steps.version.outputs.version }}
+          body: |
+            # Eclipse 4diac FORTE ${{ steps.version.outputs.version }}
+
+            ## Linux x86 Release
+
+            ### Downloads
+            - **forte-${{ steps.version.outputs.version }}-linux-x86.tar.gz**: Pre-built binary for Linux x86_64
+
+            ### Installation
+            ```bash
+            tar -xzf forte-${{ steps.version.outputs.version }}-linux-x86.tar.gz
+            cd forte-${{ steps.version.outputs.version }}-linux-x86
+            ./bin/forte
+            ```
+
+            ### System Requirements
+            - Linux x86_64
+            - glibc 2.31 or later (Ubuntu 20.04+)
+
+            ### Checksums
+            See `.sha256` file for verification.
+
+            ## Links
+            - [Documentation](https://github.com/eclipse-4diac/4diac-documentation)
+            - [Bug Reports](https://github.com/eclipse-4diac/4diac-forte/issues)
+          files: |
+            artifacts/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
